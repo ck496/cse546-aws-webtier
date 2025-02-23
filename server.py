@@ -42,21 +42,14 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
         # Return HTTP requests
         if query_result:
             # Return a success response
-            logger.info({
-                "message": f"face-recognition PASS: response: '{query_result}'"
-            })
+            logger.info(f"face-recognition PASS: response: '{query_result}'")
             return PlainTextResponse(content=query_result, status_code=200)
         else:
-            logger.info({
-                "message": f"face-recognition FAIL:  response: '{query_result}'"
-            })
+            logger.info(f"face-recognition FAIL:  response: '{query_result}'")
             return PlainTextResponse(content=None, status_code=401)
     
     except Exception as e:
-        logger.error({
-                "message": "Error in do_face_recognition()",
-                "error" : str(e)
-            })
+        logger.error(f"Error in do_face_recognition():{str(e)}")
         raise HTTPException(status_code=500, detail= {"Internal Server Error while trying facial-recognition"})
     
 
@@ -71,14 +64,9 @@ async def upload_file_to_s3(file_name, file_obj, bucket_name):
         try:
             await s3.upload_fileobj(file_obj, bucket_name, file_name) #(Fileobj, Bucket, Key)
             # print(f"Successfully uploaded file '{file_name}'  to bucket '{BUCKET_NAME}'")
-            logger.info({
-                "message": f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'"
-            })
+            logger.info(f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'")
         except Exception as e:
-            logger.error({
-                "message": f"Error while trying to upload file '{file_name}'  to bucket '{bucket_name}'",
-                "error" : str(e)
-            })
+            logger.error(f"Error while trying to upload file '{file_name}'  to bucket '{bucket_name}': {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error while uploading file '{file_name}' to s3 Bucket '{bucket_name}': {str(e)}")
 
 # Query Simple DB asynchronously
@@ -97,12 +85,13 @@ async def query_SDB(file_name, domain_name):
             else:
                 return None
         except Exception as e:
-            logger.error({
-                "message": f"Error while querying SDB {domain_name} with '{file_name}'",
-                "error" : str(e)
-            })
+            logger.error( f"Error while querying SDB {domain_name} with '{file_name}': {str(e)}")
             raise Exception(f"Error while querying SDB {domain_name} with '{file_name}': {str(e)}")
 
 
 
 # run with : uvicorn server:app --reload
+
+# run multiple instance of your application with: uvicorn server:app --host 0.0.0.0 --port 8000 --workers 4
+#   Optimal Number of Workers: A common rule of thumb is to use the number of workers equal to (2 * number of CPU cores) + 1
+
