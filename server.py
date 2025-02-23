@@ -1,13 +1,17 @@
 from fastapi import FastAPI, Request, File, UploadFile, HTTPException
 import logging
 from fastapi.responses import PlainTextResponse
-import boto3
-from botocore.exceptions import ClientError
+import aioboto3
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+BUCKET_NAME = os.getenv('BUCKET_NAME')
+DOMAIN_NAME = os.getenv('DOMAIN_NAME')
 
 logger =logging.getLogger()
 logger.setLevel(logging.INFO)
-bucket_name = ""
-domain_name = ""
 
 app = FastAPI()
 
@@ -27,13 +31,15 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
         file_obj = inputFile.file
 
         # Store file from request in s3
-        upload_file_to_s3(file_name,file_obj, bucket_name)
+        await upload_file_to_s3(file_name,file_obj, BUCKET_NAME)
         
         # Split file name at the first instance of a .
         item_name, extension = file_name.split('.',1)
-        # Perform classification
-        query_result = query_SDB(item_name, domain_name)
 
+        # Perform classification
+        query_result = await query_SDB(item_name, DOMAIN_NAME)
+
+        # Return HTTP requests
         if query_result:
             # Return a success response
             logger.info({
@@ -55,44 +61,47 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
     
 
 # ------ Helper functions -------
-# Upload given file to an s3 bucket 
-def upload_file_to_s3(file_name, file_obj, bucket_name):
-    s3 = boto3.client('s3')
-    try:
-        s3.upload_fileobj(file_obj, bucket_name, file_name) #(Fileobj, Bucket, Key)
-        # print(f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'")
-        # logger.info({
-        #     "message": f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'"
-        # })
-    except ClientError as e:
-        logger.error({
-            "message": f"Error while trying to upload file '{file_name}'  to bucket '{bucket_name}'",
-            "error" : str(e)
-        })
-        raise Exception(f"Error while uploading file '{file_name}' to s3 Bucket '{bucket_name}': {str(e)}")
 
-# Check if a given item exists in simpleDB
-def query_SDB(file_name, domain_name):
-    # print(f"[DEBUG] querying file '{file_name}' in domain '{domain_name}'")
-    try:
-        response = boto3.client('sdb').get_attributes(
-                    DomainName=domain_name,
-                    ItemName=file_name
-        )
-        if "Attributes" in response:
-            result_from_sdb = response['Attributes'][0]["Value"]
-            # print(f"[DEBUG] MATCH-FOUND '{file_name}:{result_from_sdb}' in domain '{domain_name}'")
-            return f"{file_name}:{result_from_sdb}"
-        else:
-            # print(f"[DEBUG] NO FOUND for '{file_name}' in domain '{domain_name}'")
-            # print(f"[DEBUG] sbd.get_Attributes() response: {response}")
-            return None
-    except ClientError as e:
-        logger.error({
-            "message": f"Error while querying SDB {domain_name} with '{file_name}'",
-            "error" : str(e)
-        })
-        raise Exception(f"Error while querying SDB {domain_name} with '{file_name}': {str(e)}")
+# Upload given file to an s3 bucket asynchronously  
+async def upload_file_to_s3(file_name, file_obj, bucket_name):
+
+    session = aioboto3.Session()
+    # async with manages life-cycle of async resource sdb: Makes sure aioboto3 s3 client is closed when finished await without blocking
+    async with session.client('s3') as s3:
+        try:
+            await s3.upload_fileobj(file_obj, bucket_name, file_name) #(Fileobj, Bucket, Key)
+            # print(f"Successfully uploaded file '{file_name}'  to bucket '{BUCKET_NAME}'")
+            logger.info({
+                "message": f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'"
+            })
+        except Exception as e:
+            logger.error({
+                "message": f"Error while trying to upload file '{file_name}'  to bucket '{bucket_name}'",
+                "error" : str(e)
+            })
+            raise HTTPException(status_code=500, detail=f"Error while uploading file '{file_name}' to s3 Bucket '{bucket_name}': {str(e)}")
+
+# Query Simple DB asynchronously
+async def query_SDB(file_name, domain_name):
+    session = aioboto3.Session()
+    # async with manages life-cycle of async resource sdb: Makes sure its closed when finished await without blocking
+    async with session.client('sdb') as sdb:
+        try:
+            response = await sdb.get_attributes(
+                        DomainName=domain_name,
+                        ItemName=file_name
+            )
+            if "Attributes" in response:
+                result_from_sdb = response['Attributes'][0]["Value"]
+                return f"{file_name}:{result_from_sdb}"
+            else:
+                return None
+        except Exception as e:
+            logger.error({
+                "message": f"Error while querying SDB {domain_name} with '{file_name}'",
+                "error" : str(e)
+            })
+            raise Exception(f"Error while querying SDB {domain_name} with '{file_name}': {str(e)}")
 
 
 
