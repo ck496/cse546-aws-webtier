@@ -51,7 +51,7 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
     
     except Exception as e:
         logger.error(f"Error in do_face_recognition():{str(e)}")
-        raise HTTPException(status_code=500, detail= {"Internal Server Error while trying facial-recognition"})
+        raise HTTPException(status_code=500, detail= {"message":"Internal Server Error while trying facial-recognition"})
     
 
 # ------ Helper functions -------
@@ -92,8 +92,7 @@ async def query_SDB(file_name, domain_name, region_name):
 
 
 
-# run with : uvicorn server:app --reload
 
-# run multiple instance of your application with: uvicorn server:app --host 0.0.0.0 --port 8000 --workers 4
+# run multiple instance of your application with: gunicorn -w 3 -k uvicorn.workers.UvicornWorker server:app --bind 0.0.0.0:8000 --log-level info --access-logfile - --access-logformat '%(h)s %(t)s %(r)s %(s)s %(b)s %(L)s'
 #   Optimal Number of Workers: A common rule of thumb is to use the number of workers equal to (2 * number of CPU cores) + 1
 
