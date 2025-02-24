@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, File, UploadFile, HTTPException
 import logging
 from fastapi.responses import PlainTextResponse
 import aioboto3
+from botocore.config import Config
 from dotenv import load_dotenv
 import os
 
@@ -60,9 +61,14 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
 async def upload_file_to_s3(file_name, file_obj, bucket_name, region_name):
 
     session = aioboto3.Session()
-    region = 'us-east-1'
+
+    config = Config(
+        connect_timeout=30, 
+        read_timeout=30, 
+        retries={'max_attempts': 5, 'mode': 'standard'}
+    )
     # async with manages life-cycle of async resource sdb: Makes sure aioboto3 s3 client is closed when finished await without blocking
-    async with session.client('s3', region_name=region_name) as s3:
+    async with session.client('s3', region_name=region_name, config=config) as s3:
         try:
             await s3.upload_fileobj(file_obj, bucket_name, file_name) #(Fileobj, Bucket, Key)
             # print(f"Successfully uploaded file '{file_name}'  to bucket '{BUCKET_NAME}'")
