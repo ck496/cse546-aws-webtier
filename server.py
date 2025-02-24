@@ -4,10 +4,14 @@ from fastapi.responses import PlainTextResponse
 import boto3
 from botocore.exceptions import ClientError
 
+load_dotenv()
+
 logger =logging.getLogger()
 logger.setLevel(logging.INFO)
-bucket_name = ""
-domain_name = ""
+
+BUCKET_NAME = os.getenv('BUCKET_NAME')
+DOMAIN_NAME = os.getenv('DOMAIN_NAME')
+REGION_NAME = os.getenv('REGION_NAME')
 
 app = FastAPI()
 
@@ -27,31 +31,24 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
         file_obj = inputFile.file
 
         # Store file from request in s3
-        upload_file_to_s3(file_name,file_obj, bucket_name)
+        upload_file_to_s3(file_name,file_obj, BUCKET_NAME)
         
         # Split file name at the first instance of a .
         item_name, extension = file_name.split('.',1)
         # Perform classification
-        query_result = query_SDB(item_name, domain_name)
+        query_result = query_SDB(item_name, DOMAIN_NAME)
 
         if query_result:
             # Return a success response
-            logger.info({
-                "message": f"face-recognition PASS: response: '{query_result}'"
-            })
+            # logger.info(f"face-recognition PASS: response: '{query_result}'")
             return PlainTextResponse(content=query_result, status_code=200)
         else:
-            logger.info({
-                "message": f"face-recognition FAIL:  response: '{query_result}'"
-            })
+            # logger.info(f"face-recognition FAIL:  response: '{query_result}'")
             return PlainTextResponse(content=None, status_code=401)
     
     except Exception as e:
-        logger.error({
-                "message": "Error in do_face_recognition()",
-                "error" : str(e)
-            })
-        raise HTTPException(status_code=500, detail= {"Internal Server Error while trying facial-recognition"})
+        # logger.error(f"Error in do_face_recognition():{str(e)}")
+        raise HTTPException(status_code=500, detail= {"message":"Internal Server Error while trying facial-recognition"})
     
 
 # ------ Helper functions -------
@@ -59,16 +56,12 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
 def upload_file_to_s3(file_name, file_obj, bucket_name):
     s3 = boto3.client('s3')
     try:
-        s3.upload_fileobj(file_obj, bucket_name, file_name) #(Fileobj, Bucket, Key)
-        # print(f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'")
-        # logger.info({
-        #     "message": f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'"
-        # })
+        s3.upload_fileobj(file_obj, bucket_name, file_name, ) #(Fileobj, Bucket, Key)
     except ClientError as e:
-        logger.error({
-            "message": f"Error while trying to upload file '{file_name}'  to bucket '{bucket_name}'",
-            "error" : str(e)
-        })
+        # logger.error({
+        #     "message": f"Error while trying to upload file '{file_name}'  to bucket '{bucket_name}'",
+        #     "error" : str(e)
+        # })
         raise Exception(f"Error while uploading file '{file_name}' to s3 Bucket '{bucket_name}': {str(e)}")
 
 # Check if a given item exists in simpleDB
@@ -88,10 +81,10 @@ def query_SDB(file_name, domain_name):
             # print(f"[DEBUG] sbd.get_Attributes() response: {response}")
             return None
     except ClientError as e:
-        logger.error({
-            "message": f"Error while querying SDB {domain_name} with '{file_name}'",
-            "error" : str(e)
-        })
+        # logger.error({
+        #     "message": f"Error while querying SDB {domain_name} with '{file_name}'",
+        #     "error" : str(e)
+        # })
         raise Exception(f"Error while querying SDB {domain_name} with '{file_name}': {str(e)}")
 
 
