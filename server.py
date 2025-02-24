@@ -9,6 +9,7 @@ load_dotenv()
 
 BUCKET_NAME = os.getenv('BUCKET_NAME')
 DOMAIN_NAME = os.getenv('DOMAIN_NAME')
+REGION_NAME = os.getenv('REGION_NAME')
 
 logger =logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -31,13 +32,13 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
         file_obj = inputFile.file
 
         # Store file from request in s3
-        await upload_file_to_s3(file_name,file_obj, BUCKET_NAME)
+        await upload_file_to_s3(file_name,file_obj, BUCKET_NAME, REGION_NAME)
         
         # Split file name at the first instance of a .
         item_name, extension = file_name.split('.',1)
 
         # Perform classification
-        query_result = await query_SDB(item_name, DOMAIN_NAME)
+        query_result = await query_SDB(item_name, DOMAIN_NAME, REGION_NAME)
 
         # Return HTTP requests
         if query_result:
@@ -56,11 +57,12 @@ async def do_face_recognition(inputFile: UploadFile = File(...)):
 # ------ Helper functions -------
 
 # Upload given file to an s3 bucket asynchronously  
-async def upload_file_to_s3(file_name, file_obj, bucket_name):
+async def upload_file_to_s3(file_name, file_obj, bucket_name, region_name):
 
     session = aioboto3.Session()
+    region = 'us-east-1'
     # async with manages life-cycle of async resource sdb: Makes sure aioboto3 s3 client is closed when finished await without blocking
-    async with session.client('s3') as s3:
+    async with session.client('s3', region_name=region_name) as s3:
         try:
             await s3.upload_fileobj(file_obj, bucket_name, file_name) #(Fileobj, Bucket, Key)
             # print(f"Successfully uploaded file '{file_name}'  to bucket '{BUCKET_NAME}'")
@@ -70,10 +72,10 @@ async def upload_file_to_s3(file_name, file_obj, bucket_name):
             raise HTTPException(status_code=500, detail=f"Error while uploading file '{file_name}' to s3 Bucket '{bucket_name}': {str(e)}")
 
 # Query Simple DB asynchronously
-async def query_SDB(file_name, domain_name):
+async def query_SDB(file_name, domain_name, region_name):
     session = aioboto3.Session()
     # async with manages life-cycle of async resource sdb: Makes sure its closed when finished await without blocking
-    async with session.client('sdb') as sdb:
+    async with session.client('sdb', region_name=region_name) as sdb:
         try:
             response = await sdb.get_attributes(
                         DomainName=domain_name,
