@@ -75,7 +75,7 @@ async def upload_file_to_s3(file_name, file_obj, bucket_name, region_name):
             logger.info(f"Successfully uploaded file '{file_name}'  to bucket '{bucket_name}'")
         except Exception as e:
             logger.error(f"Error while trying to upload file '{file_name}'  to bucket '{bucket_name}': {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error while uploading file '{file_name}' to s3 Bucket '{bucket_name}': {str(e)}")
+            raise Exception(f"Error while uploading file '{file_name}' to s3 Bucket '{bucket_name}': {str(e)}")
 
 # Query Simple DB asynchronously
 async def query_SDB(file_name, domain_name, region_name):
